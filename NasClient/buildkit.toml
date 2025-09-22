@@ -1,0 +1,23 @@
+[registry."docker.io"]
+mirrors = [
+  "https://docker.m.daocloud.io",
+  "https://dockerproxy.com",
+  "https://docker.mirrors.ustc.edu.cn",
+  "https://reg-mirror.qiniu.com"
+]
+
+[registry."registry-1.docker.io"]
+mirrors = [
+  "https://docker.m.daocloud.io",
+  "https://dockerproxy.com",
+  "https://docker.mirrors.ustc.edu.cn",
+  "https://reg-mirror.qiniu.com"
+]
+
+[registry."index.docker.io"]
+mirrors = [
+  "https://docker.m.daocloud.io",
+  "https://dockerproxy.com",
+  "https://docker.mirrors.ustc.edu.cn",
+  "https://reg-mirror.qiniu.com"
+]

@@ -1,0 +1,700 @@
+<%- include('partials/blank-wrapper-start.ejs') %>
+<div></div>
+<div id="blankApp">
+  <section class="section" style="margin-top:0">
+    <div class="section-header">
+      <div>
+        <span class="title" data-i18n="blank.title">Files</span>
+        <span class="sub"><span data-i18n="blank.total">Total</span>: <%= (typeof totalLabel !== 'undefined' ? totalLabel : '0 B') %></span>
+      </div>
+      <div class="controls"></div>
+    </div>
+    <div style="margin-bottom:12px;display: flex;justify-content: flex-end;">
+        <el-select v-model="subtitleFilterPending" :placeholder="t('blank.subtitleFilter')" clearable style="width:180px; margin-right:12px">
+          <el-option :label="t('filter.none')" value="none"></el-option>
+          <el-option :label="t('filter.has')" value="has"></el-option>
+          <el-option :label="t('filter.translated')" value="translated"></el-option>
+        </el-select>
+        <el-select v-model="taskFilterPending" :placeholder="t('blank.taskStatus')" clearable style="width:180px; margin-right:12px">
+          <el-option :label="t('status.done')" value="done"></el-option>
+          <el-option :label="t('status.queue')" value="queue"></el-option>
+          <el-option :label="t('status.idle')" value="idle"></el-option>
+        </el-select>
+        <el-input v-model="keywordPending" :placeholder="t('blank.searchFile')" clearable style="width:220px; margin-right:12px"></el-input>
+        <el-button type="primary" style="margin-left:12px" @click="onSearchClick">{{ t('button.search') }}</el-button>
+        
+    </div>
+
+    <div style="margin-bottom:12px;display:flex;align-items:center;gap:12px;justify-content: space-between;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <el-dropdown @command="onBatchAction" :disabled="!selectedRows.length">
+          <el-button size="small" type="primary" plain :disabled="!selectedRows.length">
+            {{ t('actions.button') }}
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="queue">{{ t('actions.queue') }}</el-dropdown-item>
+              <el-dropdown-item command="idle">{{ t('actions.idle') }}</el-dropdown-item>
+              <el-dropdown-item command="priority">{{ t('actions.priority') }}</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <span style="font-size:12px;color:#6b7280;">{{ t('selected.count', { n: selectedRows.length }) }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <!-- <el-checkbox v-model="opGenerate">{{ t('checkbox.generate') }}</el-checkbox> -->
+        <!-- <el-checkbox v-model="opTranslate">{{ t('checkbox.translate') }}</el-checkbox> -->
+        <!-- 操作区：开始/停止任务按钮 -->
+        <el-button size="small" type="primary" :loading="savingAuto" @click="handleStartStopClick">
+          {{
+            savingAuto
+              ? t('button.processing')
+              : ((srvAutoGenerate || srvAutoTranslate) ? t('button.stop') : t('button.start'))
+          }}
+        </el-button>
+      </div>
+    </div>
+
+    <div>
+      <el-table ref="tableRef" :data="pagedItems" :row-key="row => `${row.dirRel}/${row.name}`" border style="width: 100%" table-layout="auto" size="small" @selection-change="onSelectionChange">
+        <el-table-column type="selection" :reserve-selection="true" width="48"></el-table-column>
+        <el-table-column :label="t('col.index')" width="60">
+           <template #default="scope">
+             {{ scope.row && (scope.row.sequence ?? '-') }}
+           </template>
+         </el-table-column>
+        <el-table-column :label="t('col.status')" width="160">
+           <template #default="{ row }">
+             <template v-if="row.task && (row.task.status==='queued' || row.task.status==='processing')">
+             <el-tag v-if="row.task.status==='queued'" size="small" type="warning">{{ t('status.queue') }}</el-tag>
+             <el-tag v-else size="small" type="success">{{ t('status.running') }}</el-tag>
+             </template>
+             <template v-else-if="srvAutoGenerate && (!row.subs || (!row.subs.base && !row.subs.en && !row.subs.cn && !(row.subs.suffixes && row.subs.suffixes.length)))">
+             <el-tag size="small" type="warning">{{ t('status.queue') }}</el-tag>
+             </template>
+             <template v-else>
+             <el-tag size="small" type="info">{{ t('status.idle') }}</el-tag>
+             </template>
+           </template>
+         </el-table-column>
+        <el-table-column :label="t('col.name')" min-width="300">
+           <template #default="{ row }">
+             <el-tooltip :content="pathFull(row)" placement="bottom-start" effect="light">
+               <div style="display:flex;align-items:center;gap:10px;">
+                 <span style="display:inline-flex;padding:5px; border-radius:8px;background:#eef2ff;align-items:center;justify-content:center;">
+                 <svg t="1757927119837" style="width: 30px;height:30px"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9757" width="40" height="40"><path d="M825.6 153.6H198.4C124.5 153.6 64 214.1 64 288v448c0 73.9 60.5 134.4 134.4 134.4h627.2c73.9 0 134.4-60.5 134.4-134.4V288c0-73.9-60.5-134.4-134.4-134.4z m-138.2 44.8l112 112H706l-112-112h93.4z m-156.8 0l112 112H526.7l-112-112h115.9z m-179.2 0l112 112H347.5l-112-112h115.9zM108.8 288c0-41.4 28.4-76.1 66.7-86.3l108.7 108.7H108.8V288z m806.4 448c0 49.4-40.2 89.6-89.6 89.6H198.4c-49.4 0-89.6-40.2-89.6-89.6V355.2h806.4V736z m0-425.6h-52.5l-112-112h74.9c49.4 0 89.6 40.2 89.6 89.6v22.4z" p-id="9758" fill="#7288FA"></path><path d="M454 687.2l149.3-77.6c27.5-13.8 27.5-53 0-66.8L468 472.2c-31.2-15.6-68 7.1-68 42v139.6c0 27.8 29.2 45.8 54 33.4zM444.8 512l134.4 67.2-134.4 67.2V512z" p-id="9759" fill="#7288FA"></path></svg>
+                 </span>
+                 <div>
+                   <div style="font-weight:600;word-break:break-all;">{{ row.name }}</div>
+                   <div style="font-size:12px;color:#6b7280;">{{ row.sizeLabel }} · {{ row.dateLabel }}</div>
+                 </div>
+               </div>
+             </el-tooltip>
+           </template>
+         </el-table-column>
+        <el-table-column :label="t('col.subtitle')" width="200">
+           <template #default="{ row }">
+             <template v-if="row.subs && ((row.subs.suffixes && row.subs.suffixes.length) || row.subs.base || row.subs.cn || row.subs.en)">
+               <el-space size="4" wrap>
+                 <template v-if="row.subs.suffixes && row.subs.suffixes.length">
+                   <el-tag v-for="(s, i) in row.subs.suffixes" :key="i" size="small" type="info">{{ s }}</el-tag>
+                 </template>
+                 <template v-else>
+                   <el-tag v-if="row.subs.base" size="small" type="info">srt</el-tag>
+                   <el-tag v-if="row.subs.cn" size="small" type="info">cn.srt</el-tag>
+                   <el-tag v-if="row.subs.en" size="small" type="info">en.srt</el-tag>
+                 </template>
+               </el-space>
+             </template>
+             <template v-else>
+             <el-tag size="small" type="info">{{ t('tag.none') }}</el-tag>
+             </template>
+           </template>
+         </el-table-column>
+        <el-table-column :label="t('col.actions')" width="160" fixed="right">
+           <template #default="{ row }">
+             <el-dropdown @command="cmd => handleAction(row, cmd)">
+               <el-button size="small" type="primary" :loading="loading[row.name]">
+               {{ t('actions.button') }}
+               </el-button>
+               <template #dropdown>
+                 <el-dropdown-menu>
+                 <el-dropdown-item command="queue">{{ t('actions.queue') }}</el-dropdown-item>
+                 <el-dropdown-item command="idle">{{ t('actions.idle') }}</el-dropdown-item>
+                 <el-dropdown-item command="priority">{{ t('actions.priority') }}</el-dropdown-item>
+                 </el-dropdown-menu>
+               </template>
+             </el-dropdown>
+           </template>
+         </el-table-column>
+      </el-table>
+      <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+        <el-pagination
+          background
+          layout="total, sizes, prev, pager, next"
+          :total="filteredItems.length"
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[10,15,20]"
+          @current-change="onPageChange"
+          @size-change="onSizeChange"
+        />
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- 仅 blank 页面引入 Element Plus（CDN） -->
+<link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/element-plus/dist/index.full.min.js"></script>
+<script>
+  const { createApp, ref, computed, onMounted, watch } = Vue;
+   const initialItems = <%- JSON.stringify(items || []) %>;
+   const currentDirRel = <%- JSON.stringify(typeof currentDirRel !== 'undefined' ? currentDirRel : "") %>;
+   const hostMountDir = <%- JSON.stringify(typeof hostMountDir !== 'undefined' ? hostMountDir : "") %>;
+   const initialTotal = <%- (typeof total !== 'undefined' ? total : (items?items.length:0)) %>;
+   const initialPage = <%- (typeof page !== 'undefined' ? page : 1) %>;
+   const initialPageSize = <%- (typeof pageSize !== 'undefined' ? pageSize : 10) %>;
+   createApp({
+     setup(){
+     const lang = ref(window.I18N ? window.I18N.getLang() : 'zh-CN');
+
+console.log("paht",hostMountDir);
+
+    const i18nVersion = ref(0);
+     const setupI18NWatch = () => { if(window.I18N && window.I18N.onChange){ window.I18N.onChange(l => { lang.value = l; }); } };
+     setupI18NWatch();
+
+    const t = (k, params) => { lang.value; i18nVersion.value; return (window.I18N && window.I18N.t) ? window.I18N.t(k, params) : k; };
+     // 当页面初始化时 I18N 可能尚未注入，增加兜底等待，待其可用后触发一次语言变更以刷新文案
+     if(!(window.I18N && window.I18N.t)){
+       const iv = setInterval(()=>{
+         if(window.I18N && window.I18N.t){
+           clearInterval(iv);
+           try { lang.value = window.I18N.getLang ? window.I18N.getLang() : lang.value; } catch(_) { }
+           try { setupI18NWatch(); } catch(_) { }
+          try { i18nVersion.value++; } catch(_) { }
+         }
+       }, 120);
+       // 8 秒超时，避免潜在泄漏
+       setTimeout(()=>{ try{ clearInterval(iv); }catch(_){ } }, 8000);
+     }
+       const subtitleFilterPending = ref('');
+       const taskFilterPending = ref('');
+       const keywordPending = ref('');
+       // 实际用于筛选的“已应用”状态，仅在点击搜索时更新
+       const appliedSubtitleFilter = ref('');
+       const appliedTaskFilter = ref('');
+       const appliedKeyword = ref('');
+       const tgtLang = ref(null);
+// 登录态：用于拦截“提交翻译字幕”未登录行为
+      const isLoggedIn = ref(false)
+       const loading = ref({});
+       const items = ref(initialItems);
+       const total = ref(initialTotal);
+       const page = ref(initialPage);
+       const pageSize = ref(initialPageSize);
+       // 新增：表格与批量相关的响应式状态
+       const tableRef = ref(null);
+       const selectedRows = ref([]);
+       const opGenerate = ref(false);
+       const opTranslate = ref(false);
+       const srvAutoGenerate = ref(false);
+       const srvAutoTranslate = ref(false);
+       const batchProcessing = ref(false);
+       const savingAuto = ref(false);
+       // 新增：是否已配置 OpenAI Key（来自后端设置）
+       const hasOpenaiKey = ref(false);
+       // 新增：刷新并发锁，避免分页过程中列表漂移导致重复
+       const isRefreshing = ref(false);
+      // 顶部状态栏文本元素（用于显示“当前检索文件状态”）
+      const dirStatusEl = document.getElementById('dirStatusInfo');
+      // 新增：仅首次加载时显示“文件加载中”，之后轮询始终显示“文件加载完毕”
+      const hasLoadedOnce = ref(false);
+     const filteredItems = computed(() => {
+         const arr0 = items.value || [];
+         const kw = (appliedKeyword.value || '').trim().toLowerCase();
+
+        const normTargetSuffixes = (() => {
+          const t = (tgtLang.value || '').toString().toLowerCase();
+          const out = new Set();
+          if (!t) return out;
+          // 常见语言归一化
+          if (t.includes('zh') || t.includes('中文') || t.includes('chinese') || t.includes('cn')) {
+            out.add('cn.srt'); out.add('zh.srt');
+          }
+          if (t.includes('en') || t.includes('english') || t.includes('英语')) {
+            out.add('en.srt');
+          }
+          // 从字符串中提取2字母语言码（如 ja/fr/de/es 等）
+          const m = t.match(/\b([a-z]{2})\b/);
+          if (m && m[1] && !['en','zh','cn'].includes(m[1])) out.add(`${m[1]}.srt`);
+          return out;
+        })();
+
+        const hasTranslated = (subs) => {
+          if (!subs) return false;
+          const suff = subs.suffixes || [];
+          // 若目标语言未明确，默认按常见的 en/cn 判断
+          if (!normTargetSuffixes.size) return !!(subs.en || subs.cn || suff.includes('en.srt') || suff.includes('cn.srt'));
+          for (const s of normTargetSuffixes) {
+            if (s === 'en.srt' && subs.en) return true;
+            if (s === 'cn.srt' && subs.cn) return true;
+            if (suff.includes(s)) return true;
+          }
+          return false;
+        };
+
+        const bySubtitle = (row) => {
+          const subs = row.subs;
+          if (!appliedSubtitleFilter.value || appliedSubtitleFilter.value === 'all') return true;
+          if (appliedSubtitleFilter.value === 'none') return !subs || (!subs.base && !subs.en && !subs.cn && !(subs.suffixes && subs.suffixes.length));
+          if (appliedSubtitleFilter.value === 'has') return !!(subs && (subs.base || subs.en || subs.cn || (subs.suffixes && subs.suffixes.length)));
+          if (appliedSubtitleFilter.value === 'translated') return hasTranslated(subs);
+          return true;
+        };
+
+        const byTask = (row) => {
+          const t = row.task;
+          const isQueue = !!(t && (t.status === 'queued' || t.status === 'processing'));
+          const isDone = (() => {
+            const subs = row.subs;
+            const genDone = !!(subs && subs.base); // 生成过原字幕
+            const trDone = hasTranslated(subs);    // 翻译过目标语言字幕
+            return genDone || trDone;
+          })();
+          // ... existing code ...
+          if (!appliedTaskFilter.value || appliedTaskFilter.value === 'all') return true;
+           if (appliedTaskFilter.value === 'queue') return isQueue;
+           if (appliedTaskFilter.value === 'done') return isDone;
+           if (appliedTaskFilter.value === 'idle') return !isQueue && !isDone;
+           return true;
+        };
+
+        let arr = arr0.filter(row => bySubtitle(row) && byTask(row));
+        if (kw) arr = arr.filter(x => (x.name || '').toLowerCase().includes(kw)); // 仅按文件名搜索
+        return arr;
+      });
+
+      const pathFull = (row) => {
+        const nm = (row && row.name ? row.name : '').toString();
+        const rel = (row && row.dirRel ? row.dirRel : '').toString();
+        if (hostMountDir) {
+          // Windows 主机路径：HOST_MOUNT_DIR + 可选相对子目录 + 文件名，统一反斜杠
+          const sub = rel ? ('\\' + rel.replaceAll('/', '\\')) : '';
+          return (hostMountDir + sub + '\\' + nm).replace(/\\\\/g, '\\');
+        }
+        // 回退容器路径
+        return (`/${rel ? ('data/' + rel) : 'data'}/${nm}`).replace(/\\\\/g,'/');
+      };
+      // 分页变更
+      function onPageChange(p){ page.value = p; }
+      function onSizeChange(s){ pageSize.value = s; page.value = 1; }
+      // 前端分页：对过滤结果再分页
+      const pagedItems = computed(() => {
+        const start = (page.value - 1) * pageSize.value;
+        return filteredItems.value.slice(start, start + pageSize.value);
+      });
+      // 筛选项变化后，重置到第一页（仅对“已应用”的条件生效）
+      watch([appliedSubtitleFilter, appliedTaskFilter, appliedKeyword], () => { page.value = 1; });
+
+      async function refreshList(){
+        if (isRefreshing.value) return; // 防抖：上一次尚未结束则跳过
+        isRefreshing.value = true;
+        try {
+          if (!hasLoadedOnce.value) {
+            try {
+              if (window.I18N && window.I18N.setStatus) window.I18N.setStatus('files.loading');
+            } catch(_) {}
+          } else {
+            try {
+              if (window.I18N && window.I18N.setStatus) window.I18N.setStatus('files.ready');
+            } catch(_) {}
+          }
+        } catch(_) {}
+         try{
+           const PAGE_FETCH_SIZE = 100;
+           const seen = new Set();
+           let all = [];
+           let p = 1;
+           let grandTotal = 0;
+           while(true){
+             const resp = await fetch(`/api/files?dir=${encodeURIComponent(currentDirRel)}&page=${p}&pageSize=${PAGE_FETCH_SIZE}`);
+             if(!resp.ok) break;
+             const data = await resp.json();
+             if(!(data && Array.isArray(data.items))) break;
+             if(!grandTotal) grandTotal = data.total || data.items.length;
+             // 关键：按“目录+文件名”的复合键去重，优先保留较早页的顺序
+             for (const it of data.items) {
+               const key = `${it.dirRel}/${it.name}`;
+               if (!seen.has(key)) { seen.add(key); all.push(it); }
+             }
+             if(all.length >= grandTotal || data.items.length < PAGE_FETCH_SIZE) break;
+             p++;
+           }
+           // 若后端统计在分页过程中变化，兜底再按 sequence desc / 目录 / 名字稳定排序
+           if(all.length){
+             all.sort((a, b) => {
+               const sa = Number(a.sequence) || 0;
+               const sb = Number(b.sequence) || 0;
+               if (sa !== sb) return sb - sa;
+               if ((a.dirRel || '') !== (b.dirRel || '')) return (a.dirRel || '').localeCompare(b.dirRel || '', 'zh-CN');
+               return a.name.localeCompare(b.name, 'zh-CN');
+             });
+             items.value = all;
+             total.value = grandTotal || all.length;
+           }
+         }
+         catch(e){ /* 忽略网络错误，下一轮继续 */ }
+        finally {
+          isRefreshing.value = false;
+          hasLoadedOnce.value = true;
+          try { if (window.I18N && window.I18N.setStatus) window.I18N.setStatus('files.ready'); } catch(_) {}
+        }
+      }
+
+      function onSearchClick(){
+        appliedSubtitleFilter.value = subtitleFilterPending.value;
+        appliedTaskFilter.value = taskFilterPending.value;
+        appliedKeyword.value = keywordPending.value;
+        page.value = 1;
+        try { refreshList(); } catch(_) {}
+      }
+
+      function subsLabel(subs){
+        if(!subs) return (window.I18N && window.I18N.t ? window.I18N.t('tag.none') : '-');
+        const parts = [];
+        if(subs.base) parts.push('srt');
+        if(subs.cn) parts.push('cn.srt');
+        if(subs.en) parts.push('en.srt');
+        return parts.length ? parts.join(' / ') : ((window.I18N && window.I18N.t) ? window.I18N.t('tag.none') : '-');
+      }
+
+      // 新增：表格选择变更回调，保持所选行
+      function onSelectionChange(selection){
+        selectedRows.value = selection || [];
+      }
+
+      onMounted(() => {
+        const timer = setInterval(refreshList, 2000);
+        // 立即拉取一次，之后每2秒刷新
+        refreshList();
+        // 周期轮询设置：若在运行过程中 Key 被清空且自动任务处于开启，则自动停止并持久化
+        const pollSettings = async () => {
+          try {
+            const r = await fetch('/api/settings');
+            if (!r.ok) return;
+            const data = await r.json();
+            if (data && data.ok && data.data) {
+              const hasKey = !!data.data.hasOpenaiKey;
+              hasOpenaiKey.value = hasKey;
+              if (!hasKey && (srvAutoGenerate.value || srvAutoTranslate.value)) {
+                // 本地切换为关闭并同步服务器
+                opGenerate.value = false;
+                srvAutoGenerate.value = false;
+                srvAutoTranslate.value = false;
+                try { ElementPlus.ElMessage.warning((window.I18N && window.I18N.t) ? window.I18N.t('settings.autoQueueAlert') : '当前未设置 OpenAI Key，自动任务将无法开始，请先填写 Key 并保存'); } catch(_) {}
+                await onStartAuto();
+              }
+            }
+          } catch(_) {}
+        };
+        const settingsTimer = setInterval(pollSettings, 5000);
+        // 离开页面清理
+        window.addEventListener('beforeunload', () => { try{ clearInterval(timer); }catch(_){} try{ clearInterval(settingsTimer); }catch(_){} });
+        // 读取设置中的 Target Language
+        fetch('/api/settings').then(r => r.ok ? r.json() : null).then(data => {
+          if (data && data.ok && data.data) {
+            tgtLang.value = data.data.tgtLang || null;
+            // 新增：登录态
+            isLoggedIn.value = !!data.data.isLoggedIn;
+            // 新增：是否已配置 OpenAI Key
+            hasOpenaiKey.value = !!data.data.hasOpenaiKey;
+            // 新增：根据后端设置初始化自动选项
+            try {
+              opGenerate.value = !!data.data.autoGenerate;
+              opTranslate.value = !!data.data.autoTranslate;
+              srvAutoGenerate.value = !!data.data.autoGenerate;
+              srvAutoTranslate.value = !!data.data.autoTranslate;
+            } catch(_) {}
+            // 关键：若后端显示自动任务为“开启”但当前未配置 OpenAI Key，则自动“停止任务”并同步到后端，防止误跑
+            if (data.data.autoGenerate && !data.data.hasOpenaiKey) {
+              // 本地切换为关闭
+              opGenerate.value = false;
+              srvAutoGenerate.value = false;
+              try {
+                ElementPlus.ElMessage.warning((window.I18N && window.I18N.t) ? window.I18N.t('settings.autoQueueAlert') : '当前未设置 OpenAI Key，自动任务将无法开始，请先填写 Key 并保存');
+              } catch(_) {}
+              // 同步后端：关闭自动任务并触发后端停止当前任务
+              onStartAuto();
+            }
+          }
+        }).catch(() => {});
+      });
+
+      async function createTask(row, options = {}){
+        const name = row && row.name ? row.name : '';
+        const dirRel = row && row.dirRel ? row.dirRel : '';
+        loading.value = { ...loading.value, [name]: true };
+        try {
+          // 新增：未登录时禁止提交翻译字幕（与设置页一致的交互）
+          const wantTranslate = options && options.action === 'translate_subscribe';
+          if (wantTranslate && !isLoggedIn.value) {
+            // 回滚 loading
+            loading.value = { ...loading.value, [name]: false };
+            ElementPlus.ElMessageBox.confirm(
+              (window.I18N && window.I18N.t) ? window.I18N.t('settings.notLoggedIn') : '当前未登录，登录后可使用付费功能与同步额度',
+              (window.I18N && window.I18N.t) ? window.I18N.t('settings.login') : '登录',
+              { confirmButtonText: (window.I18N && window.I18N.t) ? window.I18N.t('settings.login') : '登录', cancelButtonText: (window.I18N && window.I18N.t) ? window.I18N.t('settings.off') : '取消', type: 'warning' }
+            ).then(() => { location.href = '/login'; }).catch(() => {});
+            ElementPlus.ElMessage.warning((window.I18N && window.I18N.t) ? window.I18N.t('settings.notLoggedIn') : '当前未登录');
+            return false;
+          }
+          const resp = await fetch('/api/tasks/create-from-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, dir: dirRel, ...options })
+          });
+          const data = await resp.json();
+          if (data && data.ok) {
+            // 若是优先，仅更新顺序，无 taskId 也视为成功
+            if (options && options.priority) {
+              ElementPlus.ElMessage.success((window.I18N && window.I18N.t) ? window.I18N.t('msg.prioritySet') : 'Priority set');
+              page.value = 1;
+              await refreshList();
+              loading.value = { ...loading.value, [name]: false };
+              return data.taskId || true;
+            }
+            if (data.taskId) {
+              if(options && options.silent){
+                loading.value = { ...loading.value, [name]: false };
+                return data.taskId;
+              } else {
+                ElementPlus.ElMessage.success((window.I18N && window.I18N.t) ? window.I18N.t('msg.taskCreated') : 'Task created');
+                loading.value = { ...loading.value, [name]: false };
+                return data.taskId;
+              }
+            }
+            // 其他 ok 情况
+            ElementPlus.ElMessage.success((data && data.message) || ((window.I18N && window.I18N.t) ? window.I18N.t('msg.ok') : 'Success'));
+            loading.value = { ...loading.value, [name]: false };
+            return true;
+          } else {
+            ElementPlus.ElMessage.error((data && data.message) || ((window.I18N && window.I18N.t) ? window.I18N.t('msg.createFail') : 'Create task failed'));
+            loading.value = { ...loading.value, [name]: false };
+          }
+        } catch(e){
+          ElementPlus.ElMessage.error(((window.I18N && window.I18N.t) ? window.I18N.t('msg.netErr') : 'Network error') + ': ' + ((e && e.message) || e));
+          loading.value = { ...loading.value, [name]: false };
+        }
+      }
+
+      function handleAction(row, command){
+        if(command === 'queue'){
+          return createTask(row);
+        }
+        if(command === 'idle'){
+          ElementPlus.ElMessage.info((window.I18N && window.I18N.t) ? window.I18N.t('msg.setIdle') : 'Set to idle');
+          return;
+        }
+        if(command === 'priority'){
+          return createTask(row, { priority: true });
+        }
+      }
+
+      async function onBatchAction(command){
+        if(!selectedRows.value.length){
+          ElementPlus.ElMessage.warning((window.I18N && window.I18N.t) ? window.I18N.t('msg.selectFiles') : 'Please select files');
+          return;
+        }
+        if(command === 'idle'){
+          ElementPlus.ElMessage.info((window.I18N && window.I18N.t) ? window.I18N.t('msg.setIdle') : 'Set to idle');
+          return;
+        }
+        let successCount = 0;
+        const rows = [...selectedRows.value].sort((a, b) => (Number(b?.sequence) || 0) - (Number(a?.sequence) || 0));
+        for(const r of rows){
+          if(command === 'queue'){
+            const ret = await createTask(r);
+            if(ret) successCount++;
+            await new Promise(res => setTimeout(res, 120));
+          }
+          if(command === 'priority'){
+            const ret = await createTask(r, { priority: true });
+            if(ret) successCount++;
+            await new Promise(res => setTimeout(res, 120));
+          }
+        }
+        if(successCount > 0){
+          ElementPlus.ElMessage.success((window.I18N && window.I18N.t) ? window.I18N.t('msg.batchSubmitted') : 'All tasks submitted');
+          try { await refreshList(); } catch(_) {}
+        }
+      }
+
+      // 批量开始（根据勾选的两个选项分别为每个选中条目创建任务）
+      async function onBatchStart(){
+        if(!selectedRows.value.length){
+          ElementPlus.ElMessage.warning((window.I18N && window.I18N.t) ? window.I18N.t('msg.selectFiles') : 'Please select files');
+          return;
+        }
+        if(!opGenerate.value && !opTranslate.value){
+          ElementPlus.ElMessage.warning((window.I18N && window.I18N.t) ? window.I18N.t('msg.selectOps') : 'Please select at least one action: generate or translate [subscribe]');
+          return;
+        }
+        // 新增：未登录时禁止批量提交翻译字幕，提示登录
+        if (opTranslate.value && !isLoggedIn.value) {
+          ElementPlus.ElMessageBox.confirm(
+            (window.I18N && window.I18N.t) ? window.I18N.t('settings.notLoggedIn') : '当前未登录，登录后可使用付费功能与同步额度',
+            (window.I18N && window.I18N.t) ? window.I18N.t('settings.login') : '登录',
+            { confirmButtonText: (window.I18N && window.I18N.t) ? window.I18N.t('settings.login') : '登录', cancelButtonText: (window.I18N && window.I18N.t) ? window.I18N.t('settings.off') : '取消', type: 'warning' }
+          ).then(() => { location.href = '/login'; }).catch(() => {});
+          ElementPlus.ElMessage.warning((window.I18N && window.I18N.t) ? window.I18N.t('settings.notLoggedIn') : '当前未登录');
+          return;
+        }
+        // 临时关闭翻译任务：即便用户勾选了“翻译”，本次批量开始也不提交翻译任务
+        if (opTranslate.value) {
+          try { ElementPlus.ElMessage.info('翻译任务已暂时关闭'); } catch(_) {}
+        }
+        if(batchProcessing.value) return;
+        batchProcessing.value = true;
+        const rows = [...selectedRows.value].sort((a, b) => (Number(b?.sequence) || 0) - (Number(a?.sequence) || 0));
+        try{
+          let successCount = 0;
+          for(const r of rows){
+            if(opGenerate.value){
+              const ret1 = await createTask(r, { action: 'generate', silent: true });
+              if(ret1) successCount++;
+              await new Promise(res => setTimeout(res, 120));
+            }
+            // 翻译任务暂时禁用
+            if(false && opTranslate.value){
+              const ret2 = await createTask(r, { action: 'translate_subscribe', silent: true });
+              if(ret2) successCount++;
+              await new Promise(res => setTimeout(res, 120));
+            }
+          }
+          if(successCount > 0){
+            ElementPlus.ElMessage.success((window.I18N && window.I18N.t) ? window.I18N.t('msg.batchSubmitted') : 'All tasks submitted');
+          }
+        } finally {
+          batchProcessing.value = false;
+        }
+      }
+
+      // 新增：开始/停止按钮的集中处理，点击“开始”时立即到后端拉取 hasOpenaiKey 校验，避免先开始后 2 秒后被轮询停掉
+      async function handleStartStopClick(){
+        try {
+          if (srvAutoGenerate.value || srvAutoTranslate.value) {
+            // 停止
+            opGenerate.value = false;
+            opTranslate.value = false;
+            const ok = await onStartAuto();
+            if (ok) {
+              srvAutoGenerate.value = false;
+              srvAutoTranslate.value = false;
+            }
+            return;
+          }
+          // 开始：先实时校验后端 hasOpenaiKey
+          let liveHasKey = hasOpenaiKey.value;
+          try {
+            const r = await fetch('/api/settings');
+            const d = r && r.ok ? await r.json() : null;
+            liveHasKey = !!(d && d.ok && d.data && d.data.hasOpenaiKey);
+            hasOpenaiKey.value = liveHasKey;
+          } catch(_) {}
+          if (!liveHasKey) {
+            try {
+              ElementPlus.ElMessageBox.alert((window.I18N && window.I18N.t ? window.I18N.t('settings.autoQueueAlert') : '当前未设置 OpenAI Key，自动任务将无法开始，请先填写 Key 并保存'), 'Settings');
+            } catch(_) {
+              ElementPlus.ElMessage.warning((window.I18N && window.I18N.t ? window.I18N.t('settings.autoQueueAlert') : '当前未设置 OpenAI Key，自动任务将无法开始，请先填写 Key 并保存'));
+            }
+            return;
+          }
+          opGenerate.value = true;
+          opTranslate.value = true;
+          const ok = await onStartAuto();
+          if (ok) {
+            srvAutoGenerate.value = true;
+            srvAutoTranslate.value = true;
+          } else {
+            // 开启失败回滚选择
+            opGenerate.value = false;
+            opTranslate.value = false;
+          }
+        } catch(_) {}
+      }
+
+      // 新增：开始任务按钮 -> 保存自动选项到设置（与设置页一致），并在“开启”时再次向后端确认 hasOpenaiKey
+      async function onStartAuto(){
+        if (savingAuto.value) return false;
+        savingAuto.value = true;
+        try {
+          // 若是开启自动生成，先确认后端是否存在 Key
+          if (opGenerate.value) {
+            try {
+              const r = await fetch('/api/settings');
+              const d = r && r.ok ? await r.json() : null;
+              const okKey = !!(d && d.ok && d.data && d.data.hasOpenaiKey);
+              hasOpenaiKey.value = okKey;
+              if (!okKey) {
+                try {
+                  ElementPlus.ElMessageBox.alert((window.I18N && window.I18N.t ? window.I18N.t('settings.autoQueueAlert') : '当前未设置 OpenAI Key，自动任务将无法开始，请先填写 Key 并保存'), 'Settings');
+                } catch(_) {
+                  ElementPlus.ElMessage.warning((window.I18N && window.I18N.t ? window.I18N.t('settings.autoQueueAlert') : '当前未设置 OpenAI Key，自动任务将无法开始，请先填写 Key 并保存'));
+                }
+                opGenerate.value = false; // 回滚状态
+                return false;
+              }
+            } catch(_) {}
+          }
+
+          const resp = await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              autoGenerate: !!opGenerate.value,
+              // 强制关闭自动翻译
+              autoTranslate: false,
+            })
+          });
+          const data = await resp.json().catch(()=>null);
+          if (resp.ok && data && data.ok) {
+            ElementPlus.ElMessage.success((window.I18N && window.I18N.t) ? window.I18N.t('msg.ok') : 'Success');
+            try { refreshList(); } catch(_) {}
+            return true;
+          } else {
+            ElementPlus.ElMessage.error((data && data.message) || ((window.I18N && window.I18N.t) ? window.I18N.t('msg.saveFail') : 'Save failed'));
+            return false;
+          }
+        } catch(e){
+          ElementPlus.ElMessage.error(((window.I18N && window.I18N.t) ? window.I18N.t('msg.netErr') : 'Network error') + ': ' + ((e && e.message) || e));
+          return false;
+        } finally {
+          savingAuto.value = false;
+        }
+      }
+
+      return { t, subtitleFilterPending, taskFilterPending, keywordPending, tgtLang, loading, items, total, page, pageSize, tableRef, selectedRows, opGenerate, opTranslate, srvAutoGenerate, srvAutoTranslate, batchProcessing, savingAuto, filteredItems, pagedItems, onSelectionChange, createTask, handleAction, onBatchAction, onBatchStart, onStartAuto, onPageChange, onSizeChange, pathFull, onSearchClick, hasOpenaiKey, handleStartStopClick };
+    }
+  })
+    .use(ElementPlus, { locale: (function(){
+      const v = (localStorage.getItem('ui_lang')||'zh-CN').toLowerCase();
+      if(v==='zh-cn'||v==='zh') return window.ElementPlusLocaleZhCn;
+      if(v==='zh-tw'||v==='zh-hant') return window.ElementPlusLocaleZhTw;
+      if(v==='en-us'||v==='en') return window.ElementPlusLocaleEn;
+      if(v==='fr' || v.startsWith('fr-')) return window.ElementPlusLocaleFr;
+      if(v==='es' || v.startsWith('es-')) return window.ElementPlusLocaleEs;
+      if(v==='ru' || v.startsWith('ru-')) return window.ElementPlusLocaleRu;
+      if(v==='de' || v.startsWith('de-')) return window.ElementPlusLocaleDe;
+      if(v==='ja' || v.startsWith('ja-')) return window.ElementPlusLocaleJa;
+      if(v==='ko' || v.startsWith('ko-')) return window.ElementPlusLocaleKo;
+      return undefined;
+    })() })
+    .mount('#blankApp');
+  if (window.I18N && window.I18N.apply) { try{ window.I18N.apply(); }catch(e){} }
+ </script>
+
+ <%- include('partials/blank-wrapper-end.ejs') %>
+
