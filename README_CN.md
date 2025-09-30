@@ -1,11 +1,18 @@
 # NAS-Subtitler
 
+
+<div align="center">
+
+**🚀 为你的 NAS 媒体库，打造专属字幕工具。**
+
+**Languages:** [English](README.md) | [中文](README_CN.md) | [العربية](README_AR.md) | [Deutsch](README_DE.md) | [Español](README_ES.md) | [Français](README_FR.md) | [日本語](README_JA.md)
+
+</div>
+
 **把字幕工作，放回你的 NAS｜Make your NAS talk.**
 
 周末夜，你只想按下开始。NAS-Subtitler 守在你映射的 **`/data`** 文件夹旁：发现新视频 → 本地切好语音片段 → 自动转写与**上下文翻译** → 在原目录**写回干净的字幕**。你无需盯进度条，也不必担心素材出门。  
 这种“理所当然”的体验，来自自托管世界的共同信念——**本地控制，隐私优先，Your media, your server, your way**。
-
----
 
 ## ✅ 我们为谁而做（典型场景）
 
