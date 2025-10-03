@@ -3,7 +3,7 @@
 
 <div align="center">
 
-**🚀 NAS 미디어 라이브러리를 위한 전용 자막 도구.**
+# 🚀 NAS 미디어 라이브러리를 위한 전용 자막 도구.
 
 **Languages:** [English](README.md) | [中文](README_CN.md) | [繁體中文](README_TW.md) | [Deutsch](README_DE.md) | [Español](README_ES.md) | [Français](README_FR.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Русский](README_RU.md)
 

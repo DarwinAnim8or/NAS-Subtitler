@@ -3,7 +3,7 @@
 
 <div align="center">
 
-**🚀 NASのメディアライブラリのための専用字幕ツール。**
+# 🚀 NASのメディアライブラリのための専用字幕ツール。
 
 **Languages:** [English](README.md) | [中文](README_CN.md) | [繁體中文](README_TW.md) | [Deutsch](README_DE.md) | [Español](README_ES.md) | [Français](README_FR.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Русский](README_RU.md)
 
