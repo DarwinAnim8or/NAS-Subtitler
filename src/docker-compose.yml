@@ -1,0 +1,18 @@
+
+services:
+  file-viewer:
+    build: .
+    container_name: file-viewer
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - MOUNT_DIR=/data
+      - HOST_MOUNT_DIR=${MEDIA_DIR}
+    # command removed; use Dockerfile CMD to run prisma migrate and node server.js
+    volumes:
+      - type: bind
+        source: ${MEDIA_DIR}
+        target: /data
+        consistency: delegated
