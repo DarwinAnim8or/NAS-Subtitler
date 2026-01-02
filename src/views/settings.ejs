@@ -415,7 +415,8 @@
               
               // Use backend validation which respects OPENAI_BASE_URL
               try {
-                const diagResp = await fetch('/api/diagnose/openai');
+                const keyToTest = encodeURIComponent(trimmedKey);
+                const diagResp = await fetch(`/api/diagnose/openai?key=${keyToTest}`);
                 const diagData = await diagResp.json();
                 
                 if (!diagResp.ok || !diagData.ok) {
